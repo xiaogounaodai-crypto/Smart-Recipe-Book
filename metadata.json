@@ -1,0 +1,5 @@
+{
+  "name": "智能食谱 (Smart Recipe Book)",
+  "description": "A comprehensive recipe management app organized by categories like Meat, Vegetarian, Soups, etc., featuring AI-powered recipe generation.",
+  "requestFramePermissions": []
+}
