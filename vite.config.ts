@@ -1,17 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  base: './', // 👈 这是灵魂！确保部署后的相对路径正确
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
+  base: './', // 👈 强制使用相对路径，解决 404
   build: {
-    outDir: 'dist',
-    assetsDir: 'assets',
+    rollupOptions: {
+      input: './index.html', // 👈 明确告诉它入口在这里
+    },
   }
 });
