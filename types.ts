@@ -1,3 +1,28 @@
+export interface Recipe {
+  id: string;
+  categoryId: string;
+  name: string;
+  description: string;
+  cookingTime: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  ingredients: string[];
+  instructions: string[];
+  tags: string[];
+  createdAt: number;
+  views: number;
+  isFavorite: boolean;
+}
+
+export enum CategoryIdEnum {
+  MEAT = 'meat',
+  VEGETABLE = 'vegetable',
+  SOUP = 'soup',
+  STAPLE = 'staple',
+  SNACK = 'snack',
+  DESSERT = 'dessert',
+  DRINK = 'drink',
+  HEALTH = 'health'
+}
 // Helper to create a recipe
 const createRecipe = (
   categoryId: string, 
