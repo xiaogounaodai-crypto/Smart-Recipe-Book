@@ -1,4 +1,4 @@
-import { Category, CategoryIdEnum } from './types.ts';
+import { Category, CategoryIdEnum } from './types';
 import { 
   Beef, 
   Salad, 
