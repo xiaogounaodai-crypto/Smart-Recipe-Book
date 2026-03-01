@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: './', // 👈 强制使用相对路径，解决 404
+  base: './', 
+  root: './', // 👈 告诉 Vite：根目录就是代码所在处
   build: {
+    outDir: 'dist',
     rollupOptions: {
-      input: './index.html', // 👈 明确告诉它入口在这里
-    },
+      input: './index.html'
+    }
   }
 });
