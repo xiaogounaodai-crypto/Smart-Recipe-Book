@@ -1,86 +1,89 @@
-import { Category, CategoryIdEnum } from './types';
-import { 
-  Beef, 
-  Salad, 
-  Soup, 
-  Utensils, 
-  Cookie, 
-  IceCream, 
-  Coffee, 
-  Heart 
-} from 'lucide-react';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, X, Search, ChevronRight } from 'lucide-react';
 
-export const DEFAULT_CATEGORIES: Category[] = [
-  {
-    id: CategoryIdEnum.MEAT,
-    name: '荤菜',
-    icon: 'Beef',
-    color: 'bg-red-100 text-red-600',
-    description: '红烧肉、回锅肉、清蒸鱼等肉类佳肴'
-  },
-  {
-    id: CategoryIdEnum.VEGETABLE,
-    name: '素菜',
-    icon: 'Salad',
-    color: 'bg-green-100 text-green-600',
-    description: '清炒时蔬、地三鲜、麻婆豆腐等素食'
-  },
-  {
-    id: CategoryIdEnum.SOUP,
-    name: '汤类',
-    icon: 'Soup',
-    color: 'bg-blue-100 text-blue-600',
-    description: '老火靓汤、快手蛋花汤、羹类'
-  },
-  {
-    id: CategoryIdEnum.STAPLE,
-    name: '主食类',
-    icon: 'Utensils',
-    color: 'bg-yellow-100 text-yellow-600',
-    description: '米饭、面条、饺子、包子'
-  },
-  {
-    id: CategoryIdEnum.SNACK,
-    name: '小吃',
-    icon: 'Cookie',
-    color: 'bg-orange-100 text-orange-600',
-    description: '炸鸡、烤串、春卷等休闲小食'
-  },
-  {
-    id: CategoryIdEnum.DESSERT,
-    name: '甜品',
-    icon: 'IceCream',
-    color: 'bg-pink-100 text-pink-600',
-    description: '蛋糕、糖水、冰淇淋'
-  },
-  {
-    id: CategoryIdEnum.DRINK,
-    name: '饮品',
-    icon: 'Coffee',
-    color: 'bg-cyan-100 text-cyan-600',
-    description: '果汁、奶茶、养生茶'
-  },
-  {
-    id: CategoryIdEnum.HEALTH,
-    name: '养生',
-    icon: 'Heart',
-    color: 'bg-emerald-100 text-emerald-600',
-    description: '药膳、滋补炖品、低卡餐'
-  }
-];
+interface SeasonalRecommendationProps {
+  onSearch: (term: string) => void;
+}
 
-export const getIconComponent = (iconName: string, className?: string) => {
-  const props = { className: className || "w-6 h-6" };
-  switch (iconName) {
-    case 'Beef': return <Beef {...props} />;
-    case 'Salad': return <Salad {...props} />;
-    case 'Soup': return <Soup {...props} />;
-    case 'Utensils': return <Utensils {...props} />;
-    case 'Cookie': return <Cookie {...props} />;
-    case 'IceCream': return <IceCream {...props} />;
-    case 'Coffee': return <Coffee {...props} />;
-    case 'Heart': return <Heart {...props} />;
-    default: return <Utensils {...props} />;
-  }
+interface Recommendation {
+  title: string;
+  dish: string;
+  reason: string;
+  color: string;
+}
+
+export const SeasonalRecommendation: React.FC<SeasonalRecommendationProps> = ({ onSearch }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [rec, setRec] = useState<Recommendation | null>(null);
+
+  useEffect(() => {
+    const today = new Date();
+    const month = today.getMonth() + 1; // 1-12
+    const day = today.getDate();
+
+    let recommendation: Recommendation = {
+      title: '今日推荐',
+      dish: '红烧肉',
+      reason: '经典美味，百吃不厌',
+      color: 'bg-orange-500'
+    };
+
+    // Special Dates
+    if (month === 12 && day === 24) {
+      recommendation = { title: '平安夜', dish: '拔丝地瓜', reason: '虽然不是苹果，但甜甜蜜蜜过平安夜', color: 'bg-red-500' };
+    } else if (month === 1 && day < 20) { 
+      // Simplified Laba approximation
+      recommendation = { title: '腊八时节', dish: '杂粮粥', reason: '过了腊八就是年，喝碗热粥暖暖胃', color: 'bg-red-600' };
+    } else if ((month === 11 && day === 7) || (month === 11 && day === 8)) {
+       recommendation = { title: '立冬', dish: '猪肉白菜饺子', reason: '立冬不端饺子碗，冻掉耳朵没人管', color: 'bg-blue-500' };
+    } 
+    // Seasons
+    else if (month >= 3 && month <= 5) {
+      recommendation = { title: '春季时令', dish: '清炒时蔬', reason: '春日尝鲜，清脆爽口', color: 'bg-green-500' };
+    } else if (month >= 6 && month <= 8) {
+      recommendation = { title: '炎炎夏日', dish: '西瓜汁', reason: '消暑解渴，清凉一夏', color: 'bg-red-400' };
+    } else if (month >= 9 && month <= 11) {
+      recommendation = { title: '秋季进补', dish: '红烧肉', reason: '秋风起，贴秋膘', color: 'bg-amber-600' };
+    } else {
+      // Winter
+      recommendation = { title: '冬日暖身', dish: '酸辣汤', reason: '寒冬腊月，暖心暖胃', color: 'bg-orange-600' };
+    }
+
+    setRec(recommendation);
+  }, []);
+
+  if (!rec) return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+      {isOpen && (
+        <div className="mb-4 bg-white rounded-xl shadow-xl border border-gray-100 p-4 w-64 animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="flex justify-between items-start mb-2">
+            <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${rec.color}`}>
+              {rec.title}
+            </span>
+            <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }} className="text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">{rec.dish}</h3>
+          <p className="text-sm text-gray-500 mb-3">{rec.reason}</p>
+          <button 
+            onClick={() => { onSearch(rec.dish); setIsOpen(false); }}
+            className="w-full flex items-center justify-center px-3 py-2 bg-orange-50 text-orange-600 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors"
+          >
+            <Search className="w-3.5 h-3.5 mr-1.5" />
+            去看看做法
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-center w-14 h-14 rounded-full shadow-lg text-white transition-transform hover:scale-105 active:scale-95 ${isOpen ? 'bg-gray-600 rotate-90' : 'bg-orange-600'}`}
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <Calendar className="w-6 h-6" />}
+      </button>
+    </div>
+  );
 };
