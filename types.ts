@@ -80,3 +80,7 @@ export const INITIAL_RECIPES: Recipe[] = [
   createRecipe(CategoryIdEnum.HEALTH, '杂粮粥', '膳食纤维丰富。', '1小时', 'Easy', ['黑米', '糙米', '红豆', '燕麦'], ['提前浸泡', '煮至软烂'], ['粗粮', '健康']),
   createRecipe(CategoryIdEnum.HEALTH, '白灼虾', '鲜甜弹牙。', '10分钟', 'Easy', ['鲜虾', '姜片', '料酒'], ['水开加姜酒', '下虾煮变色捞出', '蘸酱汁'], ['高蛋白', '低卡'])
 ];
+
+
+
+// force redeploy 2026
