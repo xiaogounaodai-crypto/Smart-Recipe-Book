@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+import React from 'react';
+import * as Icons from 'lucide-react';
+import { Category } from './types';
 
-# Run and deploy your AI Studio app
+interface CategoryCardProps {
+  category: Category;
+}
 
-This contains everything you need to run your app locally.
+const CategoryCard: React.FC<CategoryCardProps> = ({ category }) => {
+  const Icon = (Icons as any)[category.icon] || Icons.Utensils;
+  
+  return (
+    <div className={`${category.color} p-6 rounded-2xl cursor-pointer transition-all hover:scale-105 shadow-sm hover:shadow-md flex flex-col items-center justify-center gap-3 text-center`}>
+      <div className="p-3 bg-white/50 rounded-full">
+        <Icon size={32} />
+      </div>
+      <span className="font-bold text-lg">{category.name}</span>
+    </div>
+  );
+};
 
-View your app in AI Studio: https://ai.studio/apps/9c9a1f6c-f4bb-4ac9-bb56-6d3f1ea2fa8c
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+export default CategoryCard;
