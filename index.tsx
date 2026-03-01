@@ -1,4 +1,3 @@
-import { Category, CategoryIdEnum } from './types';
 import { 
   Beef, 
   Salad, 
