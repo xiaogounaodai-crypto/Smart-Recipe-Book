@@ -1,315 +1,490 @@
-import React, { useState, useRef } from 'react';
-import { CategoryId, Recipe } from '../types';
-import { generateRecipeWithAI } from '../services/geminiService';
-import { Sparkles, Loader2, Save, X, Image as ImageIcon, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Recipe } from '../types';
+import { Clock, BarChart, ArrowLeft, Pencil, Trash2, Eye, Star, Users, Flame, Timer, Play, Pause, X, Sparkles, ChefHat, PlusCircle } from 'lucide-react';
 
-interface RecipeFormProps {
-  categoryId: CategoryId;
-  categoryName: string;
-  initialData?: Recipe;
-  onSave: (recipe: Omit<Recipe, 'id' | 'createdAt'>) => void;
-  onCancel: () => void;
+interface RecipeDetailProps {
+  recipe: Recipe;
+  onBack: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onToggleFavorite: () => void;
+  onToggleTry: () => void;
 }
 
-export const RecipeForm: React.FC<RecipeFormProps> = ({ 
-  categoryId, 
-  categoryName,
-  initialData, 
-  onSave, 
-  onCancel 
-}) => {
-  const [name, setName] = useState(initialData?.name || '');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [ingredientsText, setIngredientsText] = useState(initialData?.ingredients.join('\n') || '');
-  const [instructionsText, setInstructionsText] = useState(initialData?.instructions.join('\n') || '');
-  const [cookingTime, setCookingTime] = useState(initialData?.cookingTime || '');
-  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>(initialData?.difficulty || 'Medium');
-  const [image, setImage] = useState<string>(initialData?.image || '');
+interface ActiveTimer {
+  id: string;
+  label: string;
+  duration: number; // in seconds
+  remaining: number; // in seconds
+  isRunning: boolean;
+}
+
+export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEdit, onDelete, onToggleFavorite, onToggleTry }) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [isTryAnimating, setIsTryAnimating] = useState(false);
   
-  const [isGenerating, setIsGenerating] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Portion Calculator State
+  const [servingCount, setServingCount] = useState<number>(2); // Default to 2 servings
+  const [customServing, setCustomServing] = useState<string>('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
 
-  const handleAISuggest = async () => {
-    if (!name.trim()) {
-      alert("请输入菜名以便AI为您生成食谱");
-      return;
-    }
+  // Timer State
+  const [timers, setTimers] = useState<ActiveTimer[]>([]);
+  const [manualTimerMinutes, setManualTimerMinutes] = useState('');
+  const [isAddingTimer, setIsAddingTimer] = useState(false);
 
-    setIsGenerating(true);
-    try {
-      const generated = await generateRecipeWithAI(name, categoryName);
-      if (generated) {
-        if (generated.description) setDescription(generated.description);
-        if (generated.ingredients) setIngredientsText(generated.ingredients.join('\n'));
-        if (generated.instructions) setInstructionsText(generated.instructions.join('\n'));
-        if (generated.cookingTime) setCookingTime(generated.cookingTime);
-        if (generated.difficulty) setDifficulty(generated.difficulty as any);
+  // Timer Tick Effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers(prevTimers => {
+        return prevTimers.map(timer => {
+          if (timer.isRunning && timer.remaining > 0) {
+            return { ...timer, remaining: timer.remaining - 1 };
+          }
+          return timer;
+        });
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Cleanup completed timers or handle alarms (simplified here)
+  useEffect(() => {
+    timers.forEach(timer => {
+      if (timer.remaining === 0 && timer.isRunning) {
+        // In a real app, play a sound here
+        alert(`${timer.label} 计时结束！`);
+        setTimers(prev => prev.map(t => t.id === timer.id ? { ...t, isRunning: false } : t));
       }
-    } catch (e) {
-      alert("AI 生成失败，请稍后重试。");
-    } finally {
-      setIsGenerating(false);
+    });
+  }, [timers]);
+
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault(); 
+    if (onDelete) {
+       onDelete();
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Basic client-side compression using Canvas
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const MAX_SIZE = 800; // Resize to max 800px to save storage
+  const handleFavoriteClick = () => {
+    onToggleFavorite();
+    setIsAnimating(true);
+    setTimeout(() => setIsAnimating(false), 300);
+  };
 
-          if (width > height) {
-            if (width > MAX_SIZE) {
-              height *= MAX_SIZE / width;
-              width = MAX_SIZE;
-            }
-          } else {
-            if (height > MAX_SIZE) {
-              width *= MAX_SIZE / height;
-              height = MAX_SIZE;
-            }
-          }
+  const handleTryClick = () => {
+    onToggleTry();
+    setIsTryAnimating(true);
+    setTimeout(() => setIsTryAnimating(false), 300);
+  };
 
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            // Compress to JPEG 0.7 quality
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            setImage(dataUrl);
-          }
-        };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
+  // --- Portion Logic ---
+  const handleServingChange = (count: number) => {
+    setServingCount(count);
+    setIsCustomMode(false);
+    setCustomServing(''); // clear custom input when using presets
+  };
+
+  const handleCustomInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomServing(val);
+    const num = parseInt(val);
+    if (!isNaN(num) && num > 0) {
+        setServingCount(num);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave({
-      categoryId,
-      name,
-      description,
-      ingredients: ingredientsText.split('\n').filter(line => line.trim() !== ''),
-      instructions: instructionsText.split('\n').filter(line => line.trim() !== ''),
-      cookingTime,
-      difficulty,
-      image
+  const scaleIngredient = (ingredient: string): string => {
+    const defaultServing = 2; // Assuming original recipes are roughly for 2 people
+    const ratio = servingCount / defaultServing;
+    
+    if (ratio === 1) return ingredient;
+
+    // Regex to find numbers at start of string or following a space
+    // Handles integers and decimals. e.g. "500g" "1.5勺" "1/2个"(simplified to decimals for AI gen)
+    return ingredient.replace(/(\d+(\.\d+)?)/g, (match) => {
+        const val = parseFloat(match);
+        if (isNaN(val)) return match;
+        const newVal = val * ratio;
+        // Format: remove trailing zeros if integer, otherwise 1 decimal place
+        return newVal % 1 === 0 ? newVal.toFixed(0) : newVal.toFixed(1);
     });
   };
 
+  // --- Timer Logic ---
+  const startTimer = (durationSec: number, label: string) => {
+    const newTimer: ActiveTimer = {
+        id: crypto.randomUUID(),
+        label,
+        duration: durationSec,
+        remaining: durationSec,
+        isRunning: true
+    };
+    setTimers(prev => [...prev, newTimer]);
+  };
+
+  const toggleTimer = (id: string) => {
+    setTimers(prev => prev.map(t => t.id === id ? { ...t, isRunning: !t.isRunning } : t));
+  };
+
+  const removeTimer = (id: string) => {
+    setTimers(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleAddManualTimer = (e: React.FormEvent) => {
+    e.preventDefault();
+    const mins = parseFloat(manualTimerMinutes);
+    if (!isNaN(mins) && mins > 0) {
+      startTimer(mins * 60, `自定义计时 (${mins}分钟)`);
+      setManualTimerMinutes('');
+      setIsAddingTimer(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Parsing instructions to add clickable timers
+  const renderInstructionWithTimers = (text: string, stepIndex: number) => {
+    // Regex to capture Chinese time durations: e.g. "30分钟", "1.5小时", "45秒"
+    // Capturing groups: 1: number, 2: unit
+    const timeRegex = /(\d+(?:\.\d+)?)\s*(分钟|小时|秒)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = timeRegex.exec(text)) !== null) {
+        // Push text before match
+        if (match.index > lastIndex) {
+            parts.push(text.substring(lastIndex, match.index));
+        }
+
+        const num = parseFloat(match[1]);
+        const unit = match[2];
+        let seconds = 0;
+        if (unit === '分钟') seconds = num * 60;
+        else if (unit === '小时') seconds = num * 3600;
+        else if (unit === '秒') seconds = num;
+
+        parts.push(
+            <button
+                key={`${stepIndex}-${match.index}`}
+                onClick={() => startTimer(seconds, `步骤 ${stepIndex + 1}`)}
+                className="inline-flex items-center mx-1 px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 font-bold border border-orange-200 hover:bg-orange-200 hover:scale-105 transition-all text-sm align-baseline cursor-pointer"
+                title="点击开始计时"
+            >
+                <Timer className="w-3 h-3 mr-1" />
+                {match[0]}
+            </button>
+        );
+
+        lastIndex = timeRegex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+    }
+
+    return <>{parts}</>;
+  };
+
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white rounded-2xl shadow-xl my-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="flex justify-between items-center mb-6 border-b pb-4">
-        <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-          {initialData ? '编辑食谱' : '添加新食谱'}
-        </h2>
-        <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-          <X className="w-6 h-6" />
+    <div className="bg-white min-h-full pb-24 relative">
+      {/* Floating Buttons (Fixed) - Increased Z-Index to z-[60] to stay above header */}
+      <div className="fixed top-24 left-6 z-[60]">
+        <button 
+          onClick={onBack}
+          className="flex items-center justify-center w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-2xl border border-white/50 text-gray-700 hover:text-orange-600 hover:scale-110 transition-all duration-300"
+        >
+          <ArrowLeft className="w-6 h-6" />
         </button>
       </div>
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Name Input with AI Button */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">菜品名称</label>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex-1 block w-full rounded-xl border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-lg py-3 px-4 border transition-all"
-              placeholder="例如：红烧肉"
-            />
-            <button
-              type="button"
-              onClick={handleAISuggest}
-              disabled={isGenerating || !name.trim()}
-              className={`relative overflow-hidden inline-flex items-center px-6 py-3 border border-transparent text-sm font-bold rounded-xl shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-70 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 ${
-                isGenerating 
-                  ? 'text-white' 
-                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-indigo-500/30'
-              }`}
+      
+      <div className="fixed top-24 right-6 z-[60] flex gap-3">
+          {onEdit && (
+            <button 
+              onClick={onEdit}
+              className="flex items-center justify-center w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-2xl border border-white/50 text-gray-700 hover:text-blue-600 hover:bg-blue-50 hover:scale-110 transition-all duration-300"
+              title="编辑食谱"
             >
-              {isGenerating && (
-                <div className="absolute inset-0 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 animate-[pulse_1.5s_ease-in-out_infinite]" />
-              )}
-              <span className="relative flex items-center">
-                 {isGenerating ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                 {isGenerating ? 'AI 思考中...' : 'AI 自动填充'}
-              </span>
+              <Pencil className="w-5 h-5" />
             </button>
-          </div>
-          <p className="mt-2 text-xs text-gray-500 flex items-center">
-            <Sparkles className="w-3 h-3 mr-1 text-purple-500" />
-            输入菜名后点击右侧按钮，让 AI 为您自动生成食材和步骤
-          </p>
-        </div>
-
-        {/* Image Upload */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">菜品照片</label>
-          <div className="flex items-start space-x-6">
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative w-40 h-40 rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden group shadow-sm hover:shadow-md ${image ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-300 bg-gray-50 hover:bg-orange-50 hover:border-orange-400'}`}
+          )}
+          {onDelete && (
+            <button 
+              onClick={handleDelete}
+              className="flex items-center justify-center w-12 h-12 bg-white/90 backdrop-blur-md rounded-full shadow-2xl border border-white/50 text-gray-700 hover:text-red-600 hover:bg-red-50 hover:scale-110 transition-all duration-300"
+              title="删除食谱"
             >
-              {image ? (
-                <>
-                  <img src={image} alt="Preview" className="w-full h-full object-cover saturate-[1.1]" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]">
-                    <span className="text-white text-xs font-bold px-3 py-1 bg-white/20 rounded-full border border-white/50">更换图片</span>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center p-4">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm group-hover:scale-110 transition-transform">
-                     <ImageIcon className="w-6 h-6 text-gray-400 group-hover:text-orange-500" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-500 group-hover:text-orange-600">点击上传美图</span>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 pt-4 space-y-3">
-               <button 
-                 type="button"
-                 onClick={() => fileInputRef.current?.click()}
-                 className="inline-flex items-center px-4 py-2 border border-gray-200 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 transition-colors"
-               >
-                 <Upload className="w-4 h-4 mr-2" />
-                 选择图片
-               </button>
-               {image && (
-                 <button 
-                    type="button"
-                    onClick={() => setImage('')}
-                    className="ml-3 inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-                 >
-                   删除
-                 </button>
-               )}
-               <p className="text-xs text-gray-400 leading-relaxed">
-                 建议上传高饱和度的美食照片（支持 JPG/PNG），图片将自动压缩优化。
-               </p>
-            </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleImageUpload} 
-              accept="image/*" 
-              className="hidden" 
-            />
-          </div>
-        </div>
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
+      </div>
 
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">简介</label>
-          <textarea
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-sm py-3 px-4 border transition-colors bg-gray-50 focus:bg-white"
-            placeholder="简要描述这道菜的风味和特点..."
+      {/* Header Image Area - Expanded Height & Saturation */}
+      <div className="h-[400px] sm:h-[500px] w-full bg-gray-100 flex items-center justify-center relative overflow-hidden group">
+        {recipe.image ? (
+          <img 
+            src={recipe.image} 
+            alt={recipe.name} 
+            className="w-full h-full object-cover saturate-[1.15] transition-transform duration-700 hover:scale-105" 
           />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-orange-100 via-yellow-100 to-orange-50 flex items-center justify-center">
+             <span className="text-8xl opacity-20 select-none animate-bounce">🍲</span>
+          </div>
+        )}
+
+        {/* Title Overlay with Glassmorphism */}
+        <div className="absolute bottom-0 left-0 right-0 p-8 pt-32 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white">
+             <div className="max-w-4xl mx-auto">
+                <h1 className="text-4xl sm:text-5xl font-extrabold drop-shadow-xl tracking-tight mb-2">{recipe.name}</h1>
+                {/* Health Tags */}
+                {recipe.tags && recipe.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {recipe.tags.map((tag, idx) => (
+                      <span key={idx} className="bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold px-2.5 py-1 rounded-full flex items-center">
+                        {['低卡', '减脂'].some(k => tag.includes(k)) && <Flame className="w-3 h-3 mr-1 text-yellow-300" />}
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+             </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           {/* Ingredients */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center">
-              <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-              食材清单
-            </label>
-            <textarea
-              rows={10}
-              required
-              value={ingredientsText}
-              onChange={(e) => setIngredientsText(e.target.value)}
-              className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-sm border p-4 font-mono leading-relaxed bg-gray-50 focus:bg-white transition-colors"
-              placeholder={'500g 五花肉\n2片 姜\n2勺 酱油\n...'}
-            />
-            <p className="text-xs text-gray-400 mt-2 text-right">每行一项</p>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-8 relative z-10">
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 ring-1 ring-black/5">
+          
+          <div className="flex flex-wrap gap-4 mb-8 items-center border-b border-gray-100 pb-6">
+            <div className="flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-2xl border border-orange-100 text-orange-700">
+              <Clock className="w-5 h-5" />
+              <span className="font-bold">{recipe.cookingTime || '未知时间'}</span>
+            </div>
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border font-bold ${
+                recipe.difficulty === 'Easy' ? 'bg-green-50 border-green-100 text-green-700' : 
+                recipe.difficulty === 'Medium' ? 'bg-yellow-50 border-yellow-100 text-yellow-700' :
+                'bg-red-50 border-red-100 text-red-700'
+            }`}>
+              <BarChart className="w-5 h-5" />
+              <span>{recipe.difficulty === 'Easy' ? '简单难度' : recipe.difficulty === 'Medium' ? '中等难度' : '高难度'}</span>
+            </div>
+            
+            <div className="ml-auto flex items-center gap-3">
+               <button 
+                 onClick={handleTryClick}
+                 className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 shadow-sm ${
+                   recipe.isTry 
+                     ? 'bg-indigo-50 border-indigo-300 text-indigo-600 shadow-indigo-100' 
+                     : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                 } ${isTryAnimating ? 'scale-110' : ''}`}
+                 title="先存着，以后学着做"
+               >
+                 <Sparkles className={`w-5 h-5 ${recipe.isTry ? 'text-indigo-500' : 'text-gray-300'}`} />
+                 <span className={`font-bold ${recipe.isTry ? 'text-indigo-700' : ''}`}>
+                   {recipe.isTry ? '挑战中' : 'try 一 try'}
+                 </span>
+               </button>
+
+               <button 
+                 onClick={handleFavoriteClick}
+                 className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 shadow-sm ${
+                   recipe.isFavorite 
+                     ? 'bg-yellow-50 border-yellow-300 text-yellow-600 shadow-yellow-100' 
+                     : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                 } ${isAnimating ? 'scale-110' : ''}`}
+               >
+                 <Star className={`w-5 h-5 ${recipe.isFavorite ? 'fill-current text-yellow-500' : 'text-gray-300'}`} />
+                 <span className={`font-bold ${recipe.isFavorite ? 'text-yellow-700' : ''}`}>
+                   {recipe.isFavorite ? '已收藏' : '收藏'}
+                 </span>
+               </button>
+               <div className="flex items-center gap-1.5 text-gray-400 font-medium px-2">
+                 <Eye className="w-5 h-5" />
+                 <span>{recipe.views || 0} 热度</span>
+               </div>
+            </div>
           </div>
 
-          {/* Instructions */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center">
-              <span className="w-2 h-2 rounded-full bg-orange-500 mr-2"></span>
-              制作步骤
-            </label>
-            <textarea
-              rows={10}
-              required
-              value={instructionsText}
-              onChange={(e) => setInstructionsText(e.target.value)}
-              className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-sm border p-4 font-mono leading-relaxed bg-gray-50 focus:bg-white transition-colors"
-              placeholder={'1. 洗净猪肉...\n2. 冷水下锅焯水...\n3. 炒糖色...\n...'}
-            />
-            <p className="text-xs text-gray-400 mt-2 text-right">每行一步</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-gray-50 p-6 rounded-2xl border border-gray-100">
-          {/* Cooking Time */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">烹饪时间</label>
-            <input
-              type="text"
-              value={cookingTime}
-              onChange={(e) => setCookingTime(e.target.value)}
-              className="block w-full rounded-lg border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-sm py-2 px-3 border"
-              placeholder="例如：45分钟"
-            />
+          <div className="mb-10">
+             <p className="text-gray-600 text-lg leading-relaxed bg-gradient-to-r from-orange-50 to-transparent p-6 rounded-r-2xl border-l-4 border-orange-400 italic">
+               "{recipe.description || '暂无简介，快去点击编辑添加吧！'}"
+             </p>
           </div>
 
-          {/* Difficulty */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">难度</label>
-            <div className="relative">
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as any)}
-                className="block w-full rounded-lg border-gray-200 shadow-sm focus:border-orange-500 focus:ring-orange-500 text-sm py-2 px-3 border bg-white appearance-none"
-              >
-                <option value="Easy">简单</option>
-                <option value="Medium">中等</option>
-                <option value="Hard">困难</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+            {/* Section 1: Portion Calculator */}
+            <div className="bg-blue-50/50 rounded-2xl p-6 border border-blue-100">
+                <h3 className="text-lg font-extrabold text-blue-900 mb-4 flex items-center">
+                    <Users className="w-5 h-5 mr-2" />
+                    智能份量换算
+                </h3>
+                <div className="flex flex-wrap gap-2 items-center">
+                    {[1, 2, 3, 4].map(num => (
+                        <button
+                            key={num}
+                            onClick={() => handleServingChange(num)}
+                            className={`flex-1 min-w-[60px] py-2 rounded-xl text-sm font-bold transition-all ${
+                                !isCustomMode && servingCount === num
+                                    ? 'bg-blue-600 text-white shadow-md scale-105'
+                                    : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-100'
+                            }`}
+                        >
+                            {num}人
+                        </button>
+                    ))}
+                    
+                    <div className={`flex-[1.5] min-w-[100px] flex items-center bg-white rounded-xl border transition-colors ${isCustomMode ? 'border-blue-600 ring-2 ring-blue-100' : 'border-blue-200'}`}>
+                        <input 
+                            type="number"
+                            min="5"
+                            placeholder="5+"
+                            value={customServing}
+                            onClick={() => setIsCustomMode(true)}
+                            onChange={handleCustomInput}
+                            className="w-full px-3 py-2 rounded-l-xl text-sm outline-none bg-transparent"
+                        />
+                        <span className="pr-3 text-xs text-blue-400 font-bold whitespace-nowrap">自定义</span>
+                    </div>
+                </div>
+                {servingCount !== 2 && (
+                    <p className="text-xs text-blue-500 mt-3 font-medium flex items-center animate-in fade-in">
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        食材已按 {servingCount} 人份自动调整
+                    </p>
+                )}
+            </div>
+
+            {/* Section 2: Start Cooking & Tools */}
+            <div className="bg-orange-50/50 rounded-2xl p-6 border border-orange-100">
+                <h3 className="text-lg font-extrabold text-orange-900 mb-4 flex items-center">
+                    <ChefHat className="w-5 h-5 mr-2" />
+                    开始烹饪
+                </h3>
+                <div className="flex flex-col gap-3">
+                   <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
+                       <span className="text-sm font-bold text-gray-600">烹饪助手</span>
+                       {isAddingTimer ? (
+                         <form onSubmit={handleAddManualTimer} className="flex items-center gap-2">
+                            <input 
+                              autoFocus
+                              type="number"
+                              placeholder="分钟"
+                              value={manualTimerMinutes}
+                              onChange={e => setManualTimerMinutes(e.target.value)}
+                              className="w-16 py-1 px-2 border border-orange-200 rounded-lg text-sm outline-none focus:ring-1 focus:ring-orange-400"
+                            />
+                            <button type="submit" className="text-xs bg-orange-500 text-white px-2 py-1.5 rounded-lg font-bold">开始</button>
+                            <button type="button" onClick={() => setIsAddingTimer(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4"/></button>
+                         </form>
+                       ) : (
+                         <button 
+                           onClick={() => setIsAddingTimer(true)}
+                           className="flex items-center text-xs font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
+                         >
+                            <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                            添加计时器
+                         </button>
+                       )}
+                   </div>
+                   <div className="text-xs text-gray-500 leading-relaxed px-1">
+                      <span className="font-bold text-orange-400">Tips:</span> 点击下方步骤中的时间数字（如“30分钟”），也可快速启动倒计时。
+                   </div>
+                </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-10">
+            <div className="md:col-span-1">
+              <h3 className="text-xl font-extrabold text-gray-900 mb-6 flex items-center">
+                <span className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mr-3">
+                    🥗
+                </span>
+                食材清单
+              </h3>
+              <ul className="space-y-4">
+                {recipe.ingredients.map((ing, idx) => (
+                  <li key={idx} className="flex items-center p-3 rounded-xl hover:bg-orange-50/50 transition-colors border border-transparent hover:border-orange-100 group">
+                    <div className="w-2 h-2 rounded-full bg-orange-300 group-hover:bg-orange-500 mr-3 flex-shrink-0 transition-colors"></div>
+                    <span className="text-gray-700 font-medium group-hover:text-gray-900 transition-all">
+                        {scaleIngredient(ing)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="md:col-span-2">
+              <h3 className="text-xl font-extrabold text-gray-900 mb-6 flex items-center">
+                <span className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mr-3">
+                    🍳
+                </span>
+                制作步骤
+              </h3>
+              <div className="space-y-8">
+                {recipe.instructions.map((step, idx) => (
+                  <div key={idx} className="flex gap-5 group relative">
+                    <div className="flex-shrink-0 w-10 h-10 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center font-bold text-lg group-hover:bg-orange-500 group-hover:text-white transition-all shadow-sm group-hover:shadow-orange-200">
+                      {idx + 1}
+                    </div>
+                    {/* Vertical line connector */}
+                    {idx !== recipe.instructions.length - 1 && (
+                        <div className="absolute left-5 top-10 bottom-[-32px] w-0.5 bg-orange-100 group-hover:bg-orange-200 transition-colors"></div>
+                    )}
+                    <div className="pt-1.5 pb-2">
+                      <p className="text-gray-700 text-lg leading-relaxed font-medium group-hover:text-gray-900 transition-colors">
+                        {renderInstructionWithTimers(step, idx)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex justify-end pt-6 border-t gap-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-6 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
-            取消
-          </button>
-          <button
-            type="submit"
-            className="inline-flex items-center px-8 py-2.5 border border-transparent text-sm font-bold rounded-xl shadow-lg text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 hover:shadow-orange-500/30 transform hover:-translate-y-0.5 transition-all"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            保存食谱
-          </button>
+      {/* Timer Overlay */}
+      {timers.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-gray-100 z-[70] p-4 animate-in slide-in-from-bottom-full duration-300">
+            <div className="max-w-4xl mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-bold text-gray-500 flex items-center">
+                        <Timer className="w-4 h-4 mr-1" /> 烹饪计时中
+                    </h4>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-2">
+                    {timers.map(timer => (
+                        <div key={timer.id} className={`flex-shrink-0 flex items-center gap-3 px-4 py-2 rounded-xl border shadow-sm ${timer.remaining === 0 ? 'bg-red-50 border-red-200' : 'bg-white border-orange-200'}`}>
+                            <div>
+                                <p className="text-xs text-gray-400 font-medium">{timer.label}</p>
+                                <p className={`text-xl font-mono font-bold ${timer.remaining < 10 ? 'text-red-600' : 'text-gray-800'}`}>
+                                    {formatTime(timer.remaining)}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                {timer.remaining > 0 && (
+                                    <button onClick={() => toggleTimer(timer.id)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600">
+                                        {timer.isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                    </button>
+                                )}
+                                <button onClick={() => removeTimer(timer.id)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-red-500">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
-      </form>
+      )}
     </div>
   );
 };

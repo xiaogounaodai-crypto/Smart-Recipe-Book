@@ -1,210 +1,127 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getRecommendedDishes } from '../services/geminiService';
-import { X, Sparkles, Plus, Check, Loader2, RefreshCw, Clock } from 'lucide-react';
-import { Recipe } from '../types';
+import React, { useState } from 'react';
+import { recommendFromIngredients } from '../services/geminiService';
+import { Recipe, UserPreferences } from '../types';
+import { X, Sparkles, Loader2, Plus, Refrigerator, ChefHat } from 'lucide-react';
 
-interface RecommendationModalProps {
-  categoryName: string;
-  existingRecipes: Recipe[];
+interface FridgeModalProps {
   onClose: () => void;
-  onAddRecipe: (name: string) => Promise<void>;
+  onAddRecipe: (recipe: Partial<Recipe>) => void;
+  userPrefs?: UserPreferences;
 }
 
-type TaskStatus = 'idle' | 'queued' | 'processing' | 'done' | 'error';
+export const FridgeModal: React.FC<FridgeModalProps> = ({ onClose, onAddRecipe, userPrefs }) => {
+  const [ingredients, setIngredients] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [results, setResults] = useState<Partial<Recipe>[]>([]);
 
-export const RecommendationModal: React.FC<RecommendationModalProps> = ({ 
-  categoryName, 
-  existingRecipes, 
-  onClose, 
-  onAddRecipe 
-}) => {
-  const [recommendations, setRecommendations] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Queue System
-  const [queue, setQueue] = useState<string[]>([]);
-  const [processingItem, setProcessingItem] = useState<string | null>(null);
-  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
-  const [errorItems, setErrorItems] = useState<Set<string>>(new Set());
+  const handleGenerate = async () => {
+    if (!ingredients.trim()) {
+        alert('请先输入冰箱里的食材');
+        return;
+    }
 
-  // Use a ref to prevent effects from running stale closures
-  const isProcessingRef = useRef(false);
-
-  const fetchRecommendations = async () => {
-    setLoading(true);
-    setCompletedItems(new Set()); // Reset completed on refresh
-    setQueue([]); // Clear queue
+    setIsGenerating(true);
+    setResults([]);
     try {
-      const dishes = await getRecommendedDishes(categoryName);
-      
-      // Filter out dishes that are already in the existing recipes
-      const existingNames = new Set(existingRecipes.map(r => r.name));
-      const filteredDishes = dishes.filter(dish => {
-        // Simple fuzzy match: check if dish is contained in existing name or vice versa
-        // e.g., "Tomato Egg" vs "Stir-fried Tomato and Egg"
-        const isDuplicate = existingRecipes.some(r => 
-            r.name.includes(dish) || dish.includes(r.name)
-        );
-        return !isDuplicate;
-      });
-
-      setRecommendations(filteredDishes);
-    } catch (error) {
-      console.error(error);
+      const inputs = ingredients.split(/[,，\s]+/).filter(i => i.trim());
+      const recipes = await recommendFromIngredients(inputs, userPrefs);
+      setResults(recipes);
+    } catch (e) {
+      alert('AI 思考失败，请稍后重试');
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
-  };
-
-  useEffect(() => {
-    fetchRecommendations();
-  }, [categoryName]);
-
-  // Queue Processor
-  useEffect(() => {
-    const processNext = async () => {
-        if (queue.length === 0 || isProcessingRef.current) return;
-
-        isProcessingRef.current = true;
-        const currentDish = queue[0];
-        setProcessingItem(currentDish);
-
-        try {
-            await onAddRecipe(currentDish);
-            setCompletedItems(prev => new Set(prev).add(currentDish));
-        } catch (error) {
-            console.error(`Failed to add ${currentDish}`, error);
-            setErrorItems(prev => new Set(prev).add(currentDish));
-        } finally {
-            // Remove from queue and reset processing flag
-            setQueue(prev => prev.slice(1));
-            setProcessingItem(null);
-            isProcessingRef.current = false;
-        }
-    };
-
-    processNext();
-  }, [queue]); // Re-run when queue changes
-
-  const addToQueue = (dishName: string) => {
-    if (!queue.includes(dishName) && processingItem !== dishName && !completedItems.has(dishName)) {
-        setQueue(prev => [...prev, dishName]);
-    }
-  };
-
-  const getStatus = (dish: string): TaskStatus => {
-    if (completedItems.has(dish)) return 'done';
-    if (errorItems.has(dish)) return 'error';
-    if (processingItem === dish) return 'processing';
-    if (queue.includes(dish)) return 'queued';
-    return 'idle';
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center bg-orange-50">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-orange-500" />
-            <h2 className="text-lg font-bold text-gray-800">{categoryName} · 灵感菜单</h2>
+        <div className="p-5 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center gap-3">
+            <div className="bg-white p-2 rounded-xl shadow-sm">
+                <Refrigerator className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+                <h2 className="text-xl font-extrabold text-gray-800">冰箱大搜救</h2>
+                <p className="text-xs text-gray-500">输入食材，AI 为您定制食谱</p>
+            </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-white rounded-full transition-colors">
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-4 overflow-y-auto flex-1">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-4">
-              <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-              <p className="text-gray-500 text-sm">正在询问 AI 大厨推荐...</p>
-            </div>
-          ) : recommendations.length === 0 ? (
-             <div className="text-center py-8 text-gray-500">
-               <p>太棒了！您似乎已经拥有了所有经典{categoryName}食谱。</p>
-               <button onClick={fetchRecommendations} className="text-orange-600 mt-2 underline">试试获取更多灵感</button>
-             </div>
-          ) : (
-            <>
-              <p className="text-sm text-gray-500 mb-4">
-                为您挑选了经典{categoryName}（已隐藏您食谱中已有的菜品）。<br/>
-                <span className="text-orange-600">Tip: 您可以连续点击多个菜品，系统将自动排队生成。</span>
-              </p>
-              <div className="space-y-3">
-                {recommendations.map((dish, idx) => {
-                  const status = getStatus(dish);
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                        status === 'done' 
-                            ? 'bg-green-50 border-green-100' 
-                            : status === 'processing' || status === 'queued'
-                                ? 'bg-orange-50 border-orange-200'
-                                : 'bg-white border-gray-100 hover:border-orange-200 hover:shadow-sm'
-                      }`}
+        <div className="p-6 overflow-y-auto flex-1">
+            {/* Input Section */}
+            <div className="mb-8">
+                <label className="block text-sm font-bold text-gray-700 mb-2">冰箱里有哪些食材？</label>
+                <div className="relative">
+                    <textarea
+                        rows={3}
+                        value={ingredients}
+                        onChange={(e) => setIngredients(e.target.value)}
+                        className="block w-full rounded-xl border-gray-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-lg p-4 border bg-gray-50 focus:bg-white transition-colors"
+                        placeholder="例如：两个鸡蛋、半个洋葱、一根火腿肠..."
+                    />
+                    <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating || !ingredients.trim()}
+                        className="absolute bottom-3 right-3 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md disabled:opacity-50 transition-all font-bold text-sm hover:scale-105 active:scale-95"
                     >
-                      <span className={`font-medium ${status === 'done' ? 'text-green-700' : 'text-gray-700'}`}>
-                        {idx + 1}. {dish}
-                      </span>
-                      
-                      {/* Action Button Area */}
-                      <div>
-                        {status === 'done' && (
-                            <div className="flex items-center text-green-600 text-xs font-medium px-2 py-1">
-                                <Check className="w-4 h-4 mr-1" />
-                                已添加
-                            </div>
-                        )}
-                        {status === 'error' && (
-                            <span className="text-red-500 text-xs">添加失败</span>
-                        )}
-                        {status === 'processing' && (
-                             <div className="flex items-center text-orange-600 text-xs font-medium px-2 py-1">
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                生成中...
-                            </div>
-                        )}
-                        {status === 'queued' && (
-                             <div className="flex items-center text-orange-500 text-xs font-medium px-2 py-1">
-                                <Clock className="w-4 h-4 mr-1 animate-pulse" />
-                                等待中
-                            </div>
-                        )}
-                        {status === 'idle' && (
-                            <button
-                                onClick={() => addToQueue(dish)}
-                                className="flex items-center px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
-                            >
-                                <Plus className="w-3 h-3 mr-1.5" />
-                                添加
-                            </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+                        {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                        开始推荐
+                    </button>
+                </div>
+            </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-           <div className="text-xs text-gray-400">
-             {queue.length > 0 && <span>还有 {queue.length} 个任务在队列中...</span>}
-           </div>
-          <button 
-            onClick={fetchRecommendations} 
-            disabled={loading || queue.length > 0 || processingItem !== null}
-            className="flex items-center text-sm text-gray-500 hover:text-orange-600 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            换一批推荐
-          </button>
+            {/* Results Section */}
+            {isGenerating ? (
+                <div className="text-center py-12">
+                     <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                        <ChefHat className="w-8 h-8 text-blue-500" />
+                     </div>
+                     <h3 className="text-lg font-bold text-gray-700">AI 正在根据您的食材构思食谱...</h3>
+                     <p className="text-gray-500 mt-2">正在计算最佳搭配组合</p>
+                </div>
+            ) : results.length > 0 ? (
+                <div className="space-y-6">
+                    <h3 className="font-bold text-gray-800 flex items-center">
+                        <Sparkles className="w-4 h-4 mr-2 text-blue-500" />
+                        为您推荐以下 {results.length} 道美味：
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                        {results.map((recipe, idx) => (
+                            <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all flex flex-col sm:flex-row gap-4 group">
+                                <div className="flex-1">
+                                    <h4 className="text-lg font-extrabold text-gray-900 mb-1">{recipe.name}</h4>
+                                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{recipe.description}</p>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        {recipe.ingredients?.slice(0, 4).map((ing, i) => (
+                                            <span key={i} className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-md">
+                                                {ing}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
+                                        <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{recipe.cookingTime}</span>
+                                        <span>{recipe.difficulty === 'Easy' ? '简单' : recipe.difficulty === 'Medium' ? '中等' : '困难'}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center">
+                                    <button 
+                                        onClick={() => onAddRecipe(recipe)}
+                                        className="w-full sm:w-auto px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg font-bold text-sm transition-all flex items-center justify-center"
+                                    >
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        加入食谱
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
       </div>
     </div>

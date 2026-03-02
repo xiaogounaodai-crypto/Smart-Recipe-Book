@@ -1,21 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
+@import "tailwindcss";
 
 body {
-  margin: 0;
   font-family: 'Noto Sans SC', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #fdfbf7; /* 匹配你 HTML 里的背景色 */
-}
-
-#root {
-  min-height: 100vh;
+  background-color: #fdfbf7;
 }

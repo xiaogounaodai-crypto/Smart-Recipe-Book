@@ -1,182 +1,112 @@
-import React, { useState } from 'react';
-import { X, Smartphone, ArrowRight, Lock, UserPlus, LogIn } from 'lucide-react';
+import React from 'react';
+import { ChefHat, UserCircle, Sparkles, Star } from 'lucide-react';
 import { User } from '../types';
 
-interface LoginModalProps {
-  onLogin: (user: User) => void;
-  onClose: () => void;
+interface LayoutProps {
+  children: React.ReactNode;
+  onHomeClick: () => void;
+  onTryClick: () => void;
+  onSignatureClick: () => void;
+  user: User | null;
+  onLoginClick: () => void;
+  onProfileClick: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ onLogin, onClose }) => {
-  const [step, setStep] = useState<'phone' | 'password_login' | 'password_register'>('phone');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [tempUser, setTempUser] = useState<User | null>(null);
-
-  const handlePhoneSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    
-    if (phone.length < 11) {
-      setError('请输入有效的11位手机号');
-      return;
-    }
-
-    // Check if user exists in localStorage
-    const userKey = `user_profile_${phone}`;
-    const storedUser = localStorage.getItem(userKey);
-
-    if (storedUser) {
-      // User exists, go to login
-      setTempUser(JSON.parse(storedUser));
-      setStep('password_login');
-    } else {
-      // New user, go to register
-      setStep('password_register');
-    }
-  };
-
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password || password.length < 6) {
-      setError('密码至少需要6位');
-      return;
-    }
-
-    // Create new user
-    const newUser: User = {
-      phoneNumber: phone,
-      password: password, // In a real app, hash this!
-      name: `用户${phone.slice(-4)}`,
-      createdAt: Date.now(),
-      preferences: {
-        spiciness: 'Medium',
-        dietaryRestrictions: '',
-        favoriteFlavors: ''
-      }
-    };
-
-    // Save profile immediately
-    localStorage.setItem(`user_profile_${phone}`, JSON.stringify(newUser));
-    onLogin(newUser);
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempUser) return;
-
-    if (tempUser.password === password) {
-      onLogin(tempUser);
-    } else {
-      setError('密码错误，请重试');
-    }
-  };
-
+export const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  onHomeClick, 
+  onTryClick,
+  onSignatureClick,
+  user,
+  onLoginClick,
+  onProfileClick
+}) => {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-800">
-            {step === 'phone' ? '登录 / 注册' : step === 'password_login' ? '欢迎回来' : '创建新账号'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <div className="min-h-screen flex flex-col max-w-5xl mx-auto bg-white shadow-xl overflow-hidden">
+      <header className="bg-orange-500 text-white p-4 sticky top-0 z-50 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={onHomeClick}
+              className="flex items-center space-x-2 hover:opacity-90 transition-opacity"
+            >
+              <ChefHat className="w-8 h-8" />
+              <h1 className="text-xl font-bold tracking-wide">智能食谱</h1>
+            </button>
+            
+            {/* Mobile Account Button */}
+            <div className="sm:hidden">
+              {user ? (
+                <button onClick={onProfileClick} className="w-8 h-8 rounded-full bg-white text-orange-600 flex items-center justify-center text-xs font-bold">
+                  {user.name.charAt(0)}
+                </button>
+              ) : (
+                <button onClick={onLoginClick} className="text-white">
+                  <UserCircle className="w-6 h-6" />
+                </button>
+              )}
+            </div>
+          </div>
 
-        <div className="p-6">
-           <div className="flex justify-center mb-6">
-             <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${
-               step === 'password_register' ? 'bg-green-100' : 'bg-orange-100'
-             }`}>
-               {step === 'phone' && <Smartphone className="w-8 h-8 text-orange-500" />}
-               {step === 'password_login' && <LogIn className="w-8 h-8 text-orange-500" />}
-               {step === 'password_register' && <UserPlus className="w-8 h-8 text-green-600" />}
-             </div>
-           </div>
-           
-           {step === 'phone' && (
-             <form onSubmit={handlePhoneSubmit} className="space-y-4">
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">手机号码</label>
-                 <input 
-                   type="tel" 
-                   value={phone}
-                   onChange={(e) => setPhone(e.target.value)}
-                   className="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-orange-500 focus:border-orange-500 p-3 border"
-                   placeholder="请输入手机号"
-                   autoFocus
-                 />
-               </div>
-               {error && <p className="text-xs text-red-500">{error}</p>}
+          <nav className="flex items-center justify-center sm:justify-start gap-6 text-sm font-medium">
+            <button 
+              onClick={onHomeClick}
+              className="hover:text-orange-100 transition-colors py-1 border-b-2 border-transparent hover:border-orange-200"
+            >
+              首页
+            </button>
+            <button 
+              onClick={onTryClick}
+              className="hover:text-orange-100 transition-colors py-1 border-b-2 border-transparent hover:border-orange-200 flex items-center gap-1"
+            >
+              <Sparkles className="w-4 h-4" />
+              try 一 try
+            </button>
+            <button 
+              onClick={onSignatureClick}
+              className="hover:text-orange-100 transition-colors py-1 border-b-2 border-transparent hover:border-orange-200 flex items-center gap-1"
+            >
+              <Star className="w-4 h-4" />
+              拿手好菜
+            </button>
+            <button 
+              onClick={user ? onProfileClick : onLoginClick}
+              className="hover:text-orange-100 transition-colors py-1 border-b-2 border-transparent hover:border-orange-200 flex items-center gap-1"
+            >
+              <UserCircle className="w-4 h-4" />
+              账号
+            </button>
+          </nav>
+          
+          <div className="hidden sm:flex items-center gap-4">
+             {user ? (
                <button 
-                 type="submit"
-                 className="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                 onClick={onProfileClick}
+                 className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 py-1.5 px-3 rounded-full transition-colors border border-orange-400"
                >
-                 下一步 <ArrowRight className="ml-2 w-4 h-4" />
+                 <div className="w-6 h-6 rounded-full bg-white text-orange-600 flex items-center justify-center text-xs font-bold">
+                   {user.name.charAt(0)}
+                 </div>
+                 <span className="text-sm font-medium truncate max-w-[80px]">{user.name}</span>
                </button>
-             </form>
-           )}
-
-           {step === 'password_login' && (
-             <form onSubmit={handleLogin} className="space-y-4">
-               <div className="text-center mb-2">
-                 <p className="text-gray-800 font-medium">{phone}</p>
-                 <button type="button" onClick={() => setStep('phone')} className="text-xs text-orange-600">切换账号</button>
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">密码</label>
-                 <input 
-                   type="password" 
-                   value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   className="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-orange-500 focus:border-orange-500 p-3 border"
-                   placeholder="请输入登录密码"
-                   autoFocus
-                 />
-               </div>
-               {error && <p className="text-xs text-red-500">{error}</p>}
+             ) : (
                <button 
-                 type="submit"
-                 className="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                 onClick={onLoginClick}
+                 className="flex items-center gap-1.5 bg-white text-orange-600 hover:bg-orange-50 py-1.5 px-3 rounded-full text-sm font-bold transition-colors shadow-sm"
                >
-                 <LogIn className="mr-2 w-4 h-4" />
+                 <UserCircle className="w-4 h-4" />
                  登录
                </button>
-             </form>
-           )}
-
-           {step === 'password_register' && (
-             <form onSubmit={handleRegister} className="space-y-4">
-               <div className="text-center mb-2">
-                 <p className="text-sm text-gray-500">该手机号尚未注册</p>
-                 <p className="text-gray-800 font-medium">{phone}</p>
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">设置密码</label>
-                 <input 
-                   type="password" 
-                   value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   className="block w-full rounded-xl border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 p-3 border"
-                   placeholder="请设置6位以上密码"
-                   autoFocus
-                 />
-               </div>
-               {error && <p className="text-xs text-red-500">{error}</p>}
-               <button 
-                 type="submit"
-                 className="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-               >
-                 <UserPlus className="mr-2 w-4 h-4" />
-                 注册并登录
-               </button>
-               <button type="button" onClick={() => setStep('phone')} className="w-full text-xs text-gray-400 mt-2">返回修改手机号</button>
-             </form>
-           )}
+             )}
+          </div>
         </div>
-      </div>
+      </header>
+      <main className="flex-1 overflow-y-auto bg-[#fdfbf7]">
+        {children}
+      </main>
+      <footer className="p-4 bg-gray-50 text-center text-gray-400 text-xs border-t">
+        © 2026 Smart Recipe Book. Powered by Gemini.
+      </footer>
     </div>
   );
 };
